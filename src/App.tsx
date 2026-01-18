@@ -661,7 +661,7 @@ function App() {
                         bg-gradient-to-r from-[#111636] to-[#31324E]/70
                         bg-opacity-80 backdrop-blur-lg border-b border-white/10
                         shadow-md flex items-center justify-center gap-3">
-          <img src="new-cart-white.png" alt="icon" className="w-10 h-10" />
+          <img src="https://i.ibb.co/8RY1w5K/new-icon-white-removebg-preview.png" alt="icon" className="w-10 h-10" />
           QuickCart
         </div>
 
