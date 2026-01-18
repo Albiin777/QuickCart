@@ -12,6 +12,14 @@ import {
 } from "./firebase"
 import type { User } from "./firebase"
 
+function getListIdFromPath(pathname: string): number | null {
+  const match = pathname.match(/^\/list\/([-]?\d+\.?\d*)$/)
+  if (match) {
+    return Number(match[1])
+  }
+  return null
+}
+
 function formatDate(date: Date) {
   const d = new Date(date)
   const month = String(d.getMonth() + 1).padStart(2, "0")
@@ -325,7 +333,10 @@ function MobileMenu({ user, setShowMobileMenu, setShowAuthModal, handleSignOut }
 function App() {
   const [lists, setLists] = useState<CartList[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
-  const [activeListId, setActiveListId] = useState<number | null>(null)
+  const [activeListId, setActiveListId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null
+    return getListIdFromPath(window.location.pathname)
+  })
   const [editingListName, setEditingListName] = useState(false)
   const [tempListName, setTempListName] = useState("")
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
@@ -447,6 +458,24 @@ function App() {
     }
   }, [lists, useWithoutSignIn, user])
 
+  // Handle browser/mobile back button
+  useEffect(() => {
+    const handlePopState = () => {
+      const listIdFromUrl = getListIdFromPath(window.location.pathname)
+      if (listIdFromUrl && lists.some(l => l.id === listIdFromUrl)) {
+        setActiveListId(listIdFromUrl)
+      } else {
+        setActiveListId(null)
+      }
+      setSearchQuery("")
+      setEditingListName(false)
+      setEditingItemId(null)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [lists])
+
   // Auth handlers
   const handleSignIn = useCallback(async () => {
     setAuthError("")
@@ -492,6 +521,7 @@ function App() {
       setShowMobileMenu(false)
       setShowSignOutConfirm(false)
       setInitialLoadDone(false)
+      window.history.pushState(null, "", "/")
     } catch (error) {
       console.error("Error signing out:", error)
     }
@@ -641,6 +671,21 @@ function App() {
     return sourceList?.name || null
   }
 
+  // Navigate to list
+  const openList = (listId: number) => {
+    setActiveListId(listId)
+    window.history.pushState(null, "", `/list/${listId}`)
+  }
+
+  // Navigate back to home
+  const goHome = () => {
+    if (editingListName) saveListName()
+    if (editingItemId) saveItemName(editingItemId)
+    setActiveListId(null)
+    setSearchQuery("")
+    window.history.pushState(null, "", "/")
+  }
+
   // Loading screen
   if (authLoading) {
     return (
@@ -661,7 +706,7 @@ function App() {
                         bg-gradient-to-r from-[#111636] to-[#31324E]/70
                         bg-opacity-80 backdrop-blur-lg border-b border-white/10
                         shadow-md flex items-center justify-center gap-3">
-          <img src="\new-cart-white.png" alt="icon" className="w-10 h-10" />
+          <img src="/new-cart-white.png" alt="icon" className="w-10 h-10" />
           QuickCart
         </div>
 
@@ -767,12 +812,7 @@ function App() {
                         bg-opacity-80 backdrop-blur-lg border-b border-white/10
                         shadow-md flex items-center gap-3">
           <button 
-            onClick={() => {
-              if (editingListName) saveListName()
-              if (editingItemId) saveItemName(editingItemId)
-              setActiveListId(null)
-              setSearchQuery("")
-            }}
+            onClick={goHome}
             className="text-3xl text-white hover:text-gray-300"
           >
             ←
@@ -1073,7 +1113,7 @@ function App() {
                       bg-opacity-80 backdrop-blur-lg border-b border-white/10
                       shadow-md flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="new-cart-white.png" alt="icon" className="w-10 h-10" />
+          <img src="/new-cart-white.png" alt="icon" className="w-10 h-10" />
           <span>QuickCart</span>
         </div>
         
@@ -1165,7 +1205,7 @@ function App() {
                          }`}
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return
-                setActiveListId(list.id)
+                openList(list.id)
               }}
             >
               <div className="flex flex-col">
@@ -1239,7 +1279,7 @@ function App() {
                 items: []
               }
             ])
-            setActiveListId(newId)
+            openList(newId)
           }}
         >
           <div className="w-10 h-10 rounded-lg flex items-center justify-center text-2xl leading-none font-bold">
