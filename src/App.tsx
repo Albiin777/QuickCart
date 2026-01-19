@@ -12,24 +12,25 @@ import {
 } from "./firebase"
 import type { User } from "./firebase"
 
+// Parse list id from URL path, e.g. /list/123 or /list/-1
 function getListIdFromPath(pathname: string): number | null {
-  const match = pathname.match(/^\/list\/([-]?\d+\.?\d*)$/)
+  const match = pathname.match(/^\/list\/(-?\d+)$/)
   if (match) {
     return Number(match[1])
   }
   return null
 }
 
-
 function formatDate(date: Date) {
   const d = new Date(date)
   const day = String(d.getDate()).padStart(2, "0")
   const month = String(d.getMonth() + 1).padStart(2, "0")
+  const year = String(d.getFullYear()).slice(-2)
   const hours = String(d.getHours()).padStart(2, "0")
   const minutes = String(d.getMinutes()).padStart(2, "0")
 
-  // DD/MM HH:MM
-  return `${day}/${month} ${hours}:${minutes}`
+  // DD/MM/YY HH:MM
+  return `${day}/${month}/${year} ${hours}:${minutes}`
 }
 
 interface CartItem {
@@ -37,7 +38,9 @@ interface CartItem {
   name: string
   checked: boolean
   lastBought: Date | null
+  lastBoughtQuantity?: string | null
   sourceListId?: number
+  quantity: string        // free-form, e.g. "2", "100 g"
 }
 
 interface CartList {
@@ -67,7 +70,9 @@ const deserializeLists = (lists: any[]): CartList[] => {
     lastEdited: new Date(list.lastEdited),
     items: list.items.map((item: any) => ({
       ...item,
-      lastBought: item.lastBought ? new Date(item.lastBought) : null
+      lastBought: item.lastBought ? new Date(item.lastBought) : null,
+      quantity: item.quantity ?? "1",
+      lastBoughtQuantity: item.lastBoughtQuantity ?? null
     }))
   }))
 }
@@ -113,7 +118,7 @@ function AuthModal({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && authEmail && authPassword) {
+    if (e.key === "Enter" && authEmail && authPassword) {
       handleSubmit()
     }
   }
@@ -344,6 +349,7 @@ function App() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [tempItemName, setTempItemName] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [showAddedToToBuyNotice, setShowAddedToToBuyNotice] = useState(false)
 
   // Auth states
   const [user, setUser] = useState<User | null>(null)
@@ -583,7 +589,9 @@ function App() {
               id: newItemId,
               name: "",
               checked: false,
-              lastBought: null
+              lastBought: null,
+              lastBoughtQuantity: null,
+              quantity: "1"
             }]
           }
         : list
@@ -598,15 +606,16 @@ function App() {
         ? { 
             ...list, 
             lastEdited: new Date(),
-            items: list.items.map(item => 
-              item.id === itemId 
-                ? { 
-                    ...item, 
-                    checked: !item.checked,
-                    lastBought: !item.checked ? new Date() : item.lastBought
-                  }
-                : item
-            )
+            items: list.items.map(item => {
+              if (item.id !== itemId) return item
+              const togglingToChecked = !item.checked
+              return {
+                ...item,
+                checked: togglingToChecked,
+                lastBought: togglingToChecked ? new Date() : item.lastBought,
+                lastBoughtQuantity: togglingToChecked ? item.quantity : item.lastBoughtQuantity
+              }
+            })
           }
         : list
     ))
@@ -619,6 +628,21 @@ function App() {
             ...list, 
             lastEdited: new Date(),
             items: list.items.filter(item => item.id !== itemId)
+          }
+        : list
+    ))
+  }
+
+  const updateItemQuantity = (itemId: number, quantity: string) => {
+    const safeQuantity = quantity.trim() || "1"
+    setLists(prev => prev.map(list =>
+      list.id === activeListId
+        ? {
+            ...list,
+            lastEdited: new Date(),
+            items: list.items.map(item =>
+              item.id === itemId ? { ...item, quantity: safeQuantity } : item
+            )
           }
         : list
     ))
@@ -665,6 +689,9 @@ function App() {
         return [toBuyList, ...prev]
       }
     })
+
+    setShowAddedToToBuyNotice(true)
+    setTimeout(() => setShowAddedToToBuyNotice(false), 2000)
   }
 
   const getSourceListName = (sourceListId?: number) => {
@@ -673,13 +700,12 @@ function App() {
     return sourceList?.name || null
   }
 
-  // Navigate to list
   const openList = (listId: number) => {
     setActiveListId(listId)
+    setSearchQuery("")
     window.history.pushState(null, "", `/list/${listId}`)
   }
 
-  // Navigate back to home
   const goHome = () => {
     if (editingListName) saveListName()
     if (editingItemId) saveItemName(editingItemId)
@@ -835,10 +861,10 @@ function App() {
               onBlur={saveListName}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   e.currentTarget.blur()
                 }
-                if (e.key === 'Escape') {
+                if (e.key === "Escape") {
                   setTempListName(activeList.name)
                   setEditingListName(false)
                 }
@@ -919,10 +945,10 @@ function App() {
                     onBlur={() => saveItemName(item.id)}
                     onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.currentTarget.blur()
                       }
-                      if (e.key === 'Escape') {
+                      if (e.key === "Escape") {
                         setTempItemName(item.name)
                         setEditingItemId(null)
                       }
@@ -939,17 +965,29 @@ function App() {
                     {item.name || "Unnamed item"}
                   </span>
                 )}
+
                 {isToBuyList && item.sourceListId && (
                   <span className="text-xs text-blue-300">
                     From: {getSourceListName(item.sourceListId)}
                   </span>
                 )}
+
                 {item.lastBought && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-300">
                     Last bought: {formatDate(item.lastBought)}
+                    {item.lastBoughtQuantity ? ` (${item.lastBoughtQuantity})` : ""}
                   </span>
                 )}
               </div>
+
+              {/* Quantity input (free text) */}
+              <input
+                type="text"
+                value={item.quantity}
+                onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                placeholder="Qty"
+                className="w-16 px-1 py-1 rounded bg-white/10 text-center text-xs border border-white/20 text-white flex-shrink-0"
+              />
 
               <button
                 onClick={() => deleteItem(item.id)}
@@ -976,7 +1014,7 @@ function App() {
               key={item.id}
               className="flex items-center gap-3 p-4 rounded-xl
                          bg-gradient-to-r from-[#111636]/50 to-[#31324E]/40
-                         text-white shadow-lg opacity-70"
+                         text-white shadow-lg opacity-90"
             >
               <input
                 type="checkbox"
@@ -994,10 +1032,10 @@ function App() {
                     onBlur={() => saveItemName(item.id)}
                     onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.currentTarget.blur()
                       }
-                      if (e.key === 'Escape') {
+                      if (e.key === "Escape") {
                         setTempItemName(item.name)
                         setEditingItemId(null)
                       }
@@ -1014,17 +1052,29 @@ function App() {
                     {item.name || "Unnamed item"}
                   </span>
                 )}
+
                 {isToBuyList && item.sourceListId && (
-                  <span className="text-xs text-blue-300/70">
+                  <span className="text-xs text-blue-300">
                     From: {getSourceListName(item.sourceListId)}
                   </span>
                 )}
+
                 {item.lastBought && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-200">
                     Last bought: {formatDate(item.lastBought)}
+                    {item.lastBoughtQuantity ? ` (${item.lastBoughtQuantity})` : ""}
                   </span>
                 )}
               </div>
+
+              {/* Quantity input */}
+              <input
+                type="text"
+                value={item.quantity}
+                onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                placeholder="Qty"
+                className="w-16 px-1 py-1 rounded bg-white/10 text-center text-xs border border-white/20 text-white flex-shrink-0"
+              />
 
               <button
                 onClick={() => deleteItem(item.id)}
@@ -1053,24 +1103,37 @@ function App() {
           </div>
         </div>
 
-        {/* Add to To Buy Button */}
+        {/* Bottom bar: Added to To Buy notice + button */}
         {!isToBuyList && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#b8bfc7] border-t border-gray-400/30 shadow-lg">
-            <button
-              onClick={addToToBuyList}
-              className="w-full py-4 rounded-xl font-bold text-lg
-                         bg-gradient-to-r from-[#1a237e] to-[#3949ab]
-                         text-white shadow-lg
-                         transform transition
-                         hover:from-[#1a237e] hover:to-[#5c6bc0]
-                         active:scale-[0.98]
-                         flex items-center justify-center gap-2"
-            >
-              <span>🛒</span>
-              <span>Add to "To Buy" List</span>
-            </button>
-          </div>
-        )}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#b8bfc7] border-t border-gray-400/30 shadow-lg flex flex-col gap-2 items-center">
+          {uncheckedItems.length === 0 ? (
+            <div className="text-xs text-gray-700 font-medium">
+            </div>
+          ) : (
+            showAddedToToBuyNotice && (
+              <div className="px-3 py-1 rounded-full bg-green-600 text-white text-xs shadow">
+                ✅ Added to "To Buy" list
+              </div>
+            )
+          )}
+
+          <button
+            onClick={addToToBuyList}
+            disabled={uncheckedItems.length === 0}
+            className={`w-full py-4 rounded-xl font-bold text-lg
+                        bg-gradient-to-r from-[#1a237e] to-[#3949ab]
+                        text-white shadow-lg
+                        transform transition
+                        flex items-center justify-center gap-2
+                        ${uncheckedItems.length === 0
+                          ? "opacity-40 cursor-not-allowed"
+                          : "hover:from-[#1a237e] hover:to-[#5c6bc0] active:scale-[0.98]"}`}
+          >
+            <span>🛒</span>
+            <span>Add to "To Buy" List</span>
+          </button>
+        </div>
+      )}
 
         {showAuthModal && (
           <AuthModal
@@ -1175,149 +1238,149 @@ function App() {
         </button>
       </div>
 
-      {/* Sync Status Banner */}
-      {useWithoutSignIn && !user && (
-        <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
-          <span className="text-amber-800 text-sm">
-            ⚠️ Data saved locally only
-          </span>
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="text-amber-800 text-sm font-medium underline"
-          >
-            Sign in to sync
-          </button>
-        </div>
-      )}
+  {/* Sync Status Banner */}
+  {useWithoutSignIn && !user && (
+    <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+      <span className="text-amber-800 text-sm">
+        ⚠️ Data saved locally only
+      </span>
+      <button
+        onClick={() => setShowAuthModal(true)}
+        className="text-amber-800 text-sm font-medium underline"
+      >
+        Sign in to sync
+      </button>
+    </div>
+  )}
 
-      {/* Lists */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#cbd1d8] flex flex-col items-center justify-start">
-        {sortedLists.map(list => {
-          const isToBuyList = list.id === TO_BUY_LIST_ID
-          const uncheckedCount = list.items.filter(i => !i.checked).length
-          
-          return (
-            <div
-              key={list.id}
-              className={`flex items-center justify-between gap-4 p-4 rounded-xl
-                         text-white shadow-lg w-full cursor-pointer
-                         ${isToBuyList 
-                           ? 'bg-gradient-to-r from-[#1a237e] to-[#3949ab] ring-2 ring-blue-400/50' 
-                           : 'bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60'
-                         }`}
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest('button')) return
-                openList(list.id)
-              }}
-            >
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  {isToBuyList && <span>🛒</span>}
-                  <span className="text-lg font-medium">{list.name || "Untitled List"}</span>
-                  {isToBuyList && uncheckedCount > 0 && (
-                    <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                      {uncheckedCount}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-gray-300">
-                  Last edited: {formatDate(list.lastEdited)}
-                </span>
-              </div>
-
-              {deleteConfirm === list.id ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Delete forever?</span>
-                  <button
-                    className="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setLists(prev => prev.filter(l => l.id !== list.id))
-                      setDeleteConfirm(null)
-                    }}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    className="px-3 py-1 bg-gray-500 rounded hover:bg-gray-600 text-sm font-medium"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteConfirm(null)
-                    }}
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="w-9 h-9 rounded-lg flex items-center justify-center
-                             text-white hover:bg-red-600 active:scale-95"
-                  onClick={() => setDeleteConfirm(list.id)}
-                >
-                  🗑
-                </button>
-              )}
-            </div>
-          )
-        })}
-
-        {/* New List Card */}
+  {/* Lists */}
+  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#cbd1d8] flex flex-col items-center justify-start">
+    {sortedLists.map(list => {
+      const isToBuyList = list.id === TO_BUY_LIST_ID
+      const uncheckedCount = list.items.filter(i => !i.checked).length
+      
+      return (
         <div
-          className="flex items-center justify-center gap-4 p-4 rounded-xl cursor-pointer w-full
-                     bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60
-                     text-white
-                     transform transition
-                     hover:-translate-y-1 hover:shadow-lg
-                     active:scale-95
-                     shadow-lg shadow-black/20"
-          onClick={() => {
-            const newId = Date.now()
-            setLists(prev => [
-              ...prev,
-              {
-                id: newId,
-                name: "New Cart List",
-                lastEdited: new Date(),
-                items: []
-              }
-            ])
-            openList(newId)
+          key={list.id}
+          className={`flex items-center justify-between gap-4 p-4 rounded-xl
+                     text-white shadow-lg w-full cursor-pointer
+                     ${isToBuyList 
+                       ? 'bg-gradient-to-r from-[#1a237e] to-[#3949ab] ring-2 ring-blue-400/50' 
+                       : 'bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60'
+                     }`}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('button')) return
+            openList(list.id)
           }}
         >
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-2xl leading-none font-bold">
-            +
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              {isToBuyList && <span>🛒</span>}
+              <span className="text-lg font-medium">{list.name || "Untitled List"}</span>
+              {isToBuyList && uncheckedCount > 0 && (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                  {uncheckedCount}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-gray-300">
+              Last edited: {formatDate(list.lastEdited)}
+            </span>
           </div>
-          <div className="text-lg font-bold tracking-wide">
-            New list
-          </div>
-        </div>
-      </div>
 
-      {showAuthModal && (
-        <AuthModal
-          isSignUp={isSignUp}
-          setIsSignUp={setIsSignUp}
-          authEmail={authEmail}
-          setAuthEmail={setAuthEmail}
-          authPassword={authPassword}
-          setAuthPassword={setAuthPassword}
-          authError={authError}
-          setAuthError={setAuthError}
-          authProcessing={authProcessing}
-          handleSignIn={handleSignIn}
-          handleSignUp={handleSignUp}
-          setShowAuthModal={setShowAuthModal}
-        />
-      )}
-      {showMobileMenu && (
-        <MobileMenu
-          user={user}
-          setShowMobileMenu={setShowMobileMenu}
-          setShowAuthModal={setShowAuthModal}
-          handleSignOut={handleSignOut}
-        />
-      )}
+          {deleteConfirm === list.id ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Delete forever?</span>
+              <button
+                className="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setLists(prev => prev.filter(l => l.id !== list.id))
+                  setDeleteConfirm(null)
+                }}
+              >
+                Yes
+              </button>
+              <button
+                className="px-3 py-1 bg-gray-500 rounded hover:bg-gray-600 text-sm font-medium"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeleteConfirm(null)
+                }}
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              className="w-9 h-9 rounded-lg flex items-center justify-center
+                         text-white hover:bg-red-600 active:scale-95"
+              onClick={() => setDeleteConfirm(list.id)}
+            >
+              🗑
+            </button>
+          )}
+        </div>
+      )
+    })}
+
+    {/* New List Card */}
+    <div
+      className="flex items-center justify-center gap-4 p-4 rounded-xl cursor-pointer w-full
+                 bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60
+                 text-white
+                 transform transition
+                 hover:-translate-y-1 hover:shadow-lg
+                 active:scale-95
+                 shadow-lg shadow-black/20"
+      onClick={() => {
+        const newId = Date.now()
+        setLists(prev => [
+          ...prev,
+          {
+            id: newId,
+            name: "New Cart List",
+            lastEdited: new Date(),
+            items: []
+          }
+        ])
+        openList(newId)
+      }}
+    >
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-2xl leading-none font-bold">
+        +
+      </div>
+      <div className="text-lg font-bold tracking-wide">
+        New list
+      </div>
     </div>
+  </div>
+
+  {showAuthModal && (
+    <AuthModal
+      isSignUp={isSignUp}
+      setIsSignUp={setIsSignUp}
+      authEmail={authEmail}
+      setAuthEmail={setAuthEmail}
+      authPassword={authPassword}
+      setAuthPassword={setAuthPassword}
+      authError={authError}
+      setAuthError={setAuthError}
+      authProcessing={authProcessing}
+      handleSignIn={handleSignIn}
+      handleSignUp={handleSignUp}
+      setShowAuthModal={setShowAuthModal}
+    />
+  )}
+  {showMobileMenu && (
+    <MobileMenu
+      user={user}
+      setShowMobileMenu={setShowMobileMenu}
+      setShowAuthModal={setShowAuthModal}
+      handleSignOut={handleSignOut}
+    />
+  )}
+</div>
   )
 }
 
