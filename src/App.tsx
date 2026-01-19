@@ -251,9 +251,18 @@ interface MobileMenuProps {
   setShowMobileMenu: (v: boolean) => void
   setShowAuthModal: (v: boolean) => void
   handleSignOut: () => Promise<void>
+  darkMode: boolean
+  setDarkMode: (v: boolean) => void
 }
 
-function MobileMenu({ user, setShowMobileMenu, setShowAuthModal, handleSignOut }: MobileMenuProps) {
+function MobileMenu({
+  user,
+  setShowMobileMenu,
+  setShowAuthModal,
+  handleSignOut,
+  darkMode,
+  setDarkMode
+}: MobileMenuProps) {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
   return (
@@ -280,7 +289,7 @@ function MobileMenu({ user, setShowMobileMenu, setShowAuthModal, handleSignOut }
           )}
         </div>
         
-        <div className="p-4">
+        <div className="p-4 space-y-3">
           {user ? (
             showSignOutConfirm ? (
               <div className="space-y-3">
@@ -330,6 +339,20 @@ function MobileMenu({ user, setShowMobileMenu, setShowAuthModal, handleSignOut }
               Sign In
             </button>
           )}
+
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="w-full py-2 px-4 rounded-xl font-medium
+                       bg-gray-100 text-gray-800
+                       hover:bg-gray-200 transition
+                       flex items-center justify-between"
+          >
+            <span>Dark mode</span>
+            <span className="text-xs font-semibold">
+              {darkMode ? "On" : "Off"}
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -365,6 +388,21 @@ function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
+  // Dark mode
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("qc_dark_mode") === "true"
+  })
+
+  const rootBgClass = darkMode
+  ? "bg-[#0f172a] text-gray-100" // slightly lighter dark
+  : "bg-[#cbd1d8] text-gray-900"
+
+useEffect(() => {
+  if (typeof window === "undefined") return
+  document.body.style.backgroundColor = darkMode ? "#0f172a" : "#cbd1d8"
+  localStorage.setItem("qc_dark_mode", darkMode ? "true" : "false")
+}, [darkMode])
   // Track if Firestore data has been loaded once
   const [initialLoadDone, setInitialLoadDone] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -717,7 +755,7 @@ function App() {
   // Loading screen
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#cbd1d8] flex items-center justify-center">
+      <div className={`min-h-screen ${rootBgClass} flex items-center justify-center`}>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#111636] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading QuickCart...</p>
@@ -729,7 +767,7 @@ function App() {
   // Welcome screen
   if (showWelcome && !user && !useWithoutSignIn) {
     return (
-      <div className="min-h-screen bg-[#cbd1d8] flex flex-col">
+      <div className={`min-h-screen ${rootBgClass} flex flex-col`}>
         <div className="px-4 py-4 text-white text-2xl font-medium tracking-tight
                         bg-gradient-to-r from-[#111636] to-[#31324E]/70
                         bg-opacity-80 backdrop-blur-lg border-b border-white/10
@@ -833,7 +871,7 @@ function App() {
     const isToBuyList = activeList.id === TO_BUY_LIST_ID
 
     return (
-      <div className="min-h-screen bg-[#cbd1d8] flex flex-col">
+      <div className={`min-h-screen ${rootBgClass} flex flex-col`}>
         {/* Header */}
         <div className="px-4 py-4 text-white
                         bg-gradient-to-r from-[#111636] to-[#31324E]/70
@@ -1105,35 +1143,32 @@ function App() {
 
         {/* Bottom bar: Added to To Buy notice + button */}
         {!isToBuyList && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#b8bfc7] border-t border-gray-400/30 shadow-lg flex flex-col gap-2 items-center">
-          {uncheckedItems.length === 0 ? (
-            <div className="text-xs text-gray-700 font-medium">
-            </div>
-          ) : (
-            showAddedToToBuyNotice && (
-              <div className="px-3 py-1 rounded-full bg-green-600 text-white text-xs shadow">
-                ✅ Added to "To Buy" list
-              </div>
-            )
-          )}
+  <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#b8bfc7] border-t border-gray-400/30 shadow-lg flex flex-col gap-2 items-center">
+    {uncheckedItems.length > 0 && showAddedToToBuyNotice && (
+      <div className="px-3 py-1 rounded-full bg-green-600 text-white text-xs shadow">
+        ✅ Added to "To Buy" list
+      </div>
+    )}
 
-          <button
-            onClick={addToToBuyList}
-            disabled={uncheckedItems.length === 0}
-            className={`w-full py-4 rounded-xl font-bold text-lg
-                        bg-gradient-to-r from-[#1a237e] to-[#3949ab]
-                        text-white shadow-lg
-                        transform transition
-                        flex items-center justify-center gap-2
-                        ${uncheckedItems.length === 0
-                          ? "opacity-40 cursor-not-allowed"
-                          : "hover:from-[#1a237e] hover:to-[#5c6bc0] active:scale-[0.98]"}`}
-          >
-            <span>🛒</span>
-            <span>Add to "To Buy" List</span>
-          </button>
-        </div>
-      )}
+    <button
+      onClick={addToToBuyList}
+      disabled={uncheckedItems.length === 0}
+      className={`w-full py-4 rounded-xl font-bold text-lg
+                  text-white shadow-lg
+                  transform transition
+                  flex items-center justify-center gap-2
+                  ${uncheckedItems.length === 0
+                    ? "opacity-40 cursor-not-allowed"
+                    : "active:scale-[0.98]"}
+                  ${darkMode
+                    ? "bg-gradient-to-r from-[#4b5563] to-[#6b7280]"   // greyer in dark mode
+                    : "bg-gradient-to-r from-[#1a237e] to-[#3949ab] hover:from-[#1a237e] hover:to-[#5c6bc0]"}`}
+    >
+      <span>🛒</span>
+      <span>Add to "To Buy" List</span>
+    </button>
+  </div>
+)}
 
         {showAuthModal && (
           <AuthModal
@@ -1157,6 +1192,8 @@ function App() {
             setShowMobileMenu={setShowMobileMenu}
             setShowAuthModal={setShowAuthModal}
             handleSignOut={handleSignOut}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
           />
         )}
       </div>
@@ -1171,7 +1208,7 @@ function App() {
   })
 
   return (
-    <div className="min-h-screen bg-[#cbd1d8]">
+    <div className={`min-h-screen ${rootBgClass}`}>
       {/* Header */}
       <div className="px-4 py-4 text-white text-2xl font-medium tracking-tight
                       bg-gradient-to-r from-[#111636] to-[#31324E]/70
@@ -1184,6 +1221,15 @@ function App() {
         
         {/* Desktop */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 
+                       text-sm font-medium flex items-center gap-2"
+          >
+            <span>{darkMode ? "Light mode" : "Dark mode"}</span>
+          </button>
+
           {user ? (
             showSignOutConfirm ? (
               <div className="flex items-center gap-2">
@@ -1238,149 +1284,151 @@ function App() {
         </button>
       </div>
 
-  {/* Sync Status Banner */}
-  {useWithoutSignIn && !user && (
-    <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
-      <span className="text-amber-800 text-sm">
-        ⚠️ Data saved locally only
-      </span>
-      <button
-        onClick={() => setShowAuthModal(true)}
-        className="text-amber-800 text-sm font-medium underline"
-      >
-        Sign in to sync
-      </button>
-    </div>
-  )}
+      {/* Sync Status Banner */}
+      {useWithoutSignIn && !user && (
+        <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+          <span className="text-amber-800 text-sm">
+            ⚠️ Data saved locally only
+          </span>
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="text-amber-800 text-sm font-medium underline"
+          >
+            Sign in to sync
+          </button>
+        </div>
+      )}
 
-  {/* Lists */}
-  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#cbd1d8] flex flex-col items-center justify-start">
-    {sortedLists.map(list => {
-      const isToBuyList = list.id === TO_BUY_LIST_ID
-      const uncheckedCount = list.items.filter(i => !i.checked).length
-      
-      return (
-        <div
-          key={list.id}
-          className={`flex items-center justify-between gap-4 p-4 rounded-xl
-                     text-white shadow-lg w-full cursor-pointer
-                     ${isToBuyList 
-                       ? 'bg-gradient-to-r from-[#1a237e] to-[#3949ab] ring-2 ring-blue-400/50' 
-                       : 'bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60'
-                     }`}
-          onClick={(e) => {
-            if ((e.target as HTMLElement).closest('button')) return
-            openList(list.id)
-          }}
-        >
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              {isToBuyList && <span>🛒</span>}
-              <span className="text-lg font-medium">{list.name || "Untitled List"}</span>
-              {isToBuyList && uncheckedCount > 0 && (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                  {uncheckedCount}
+      {/* Lists */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col items-center justify-start">
+        {sortedLists.map(list => {
+          const isToBuyList = list.id === TO_BUY_LIST_ID
+          const uncheckedCount = list.items.filter(i => !i.checked).length
+          
+          return (
+            <div
+              key={list.id}
+              className={`flex items-center justify-between gap-4 p-4 rounded-xl
+                         text-white shadow-lg w-full cursor-pointer
+                         ${isToBuyList 
+                           ? 'bg-gradient-to-r from-[#1a237e] to-[#3949ab] ring-2 ring-blue-400/50' 
+                           : 'bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60'
+                         }`}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('button')) return
+                openList(list.id)
+              }}
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  {isToBuyList && <span>🛒</span>}
+                  <span className="text-lg font-medium">{list.name || "Untitled List"}</span>
+                  {isToBuyList && uncheckedCount > 0 && (
+                    <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                      {uncheckedCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-gray-300">
+                  Last edited: {formatDate(list.lastEdited)}
                 </span>
+              </div>
+
+              {deleteConfirm === list.id ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Delete forever?</span>
+                  <button
+                    className="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLists(prev => prev.filter(l => l.id !== list.id))
+                      setDeleteConfirm(null)
+                    }}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    className="px-3 py-1 bg-gray-500 rounded hover:bg-gray-600 text-sm font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeleteConfirm(null)
+                    }}
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="w-9 h-9 rounded-lg flex items-center justify-center
+                             text-white hover:bg-red-600 active:scale-95"
+                  onClick={() => setDeleteConfirm(list.id)}
+                >
+                  🗑
+                </button>
               )}
             </div>
-            <span className="text-xs text-gray-300">
-              Last edited: {formatDate(list.lastEdited)}
-            </span>
+          )
+        })}
+
+        {/* New List Card */}
+        <div
+          className="flex items-center justify-center gap-4 p-4 rounded-xl cursor-pointer w-full
+                     bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60
+                     text-white
+                     transform transition
+                     hover:-translate-y-1 hover:shadow-lg
+                     active:scale-95
+                     shadow-lg shadow-black/20"
+          onClick={() => {
+            const newId = Date.now()
+            setLists(prev => [
+              ...prev,
+              {
+                id: newId,
+                name: "New Cart List",
+                lastEdited: new Date(),
+                items: []
+              }
+            ])
+            openList(newId)
+          }}
+        >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-2xl leading-none font-bold">
+            +
           </div>
-
-          {deleteConfirm === list.id ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Delete forever?</span>
-              <button
-                className="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setLists(prev => prev.filter(l => l.id !== list.id))
-                  setDeleteConfirm(null)
-                }}
-              >
-                Yes
-              </button>
-              <button
-                className="px-3 py-1 bg-gray-500 rounded hover:bg-gray-600 text-sm font-medium"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDeleteConfirm(null)
-                }}
-              >
-                No
-              </button>
-            </div>
-          ) : (
-            <button
-              className="w-9 h-9 rounded-lg flex items-center justify-center
-                         text-white hover:bg-red-600 active:scale-95"
-              onClick={() => setDeleteConfirm(list.id)}
-            >
-              🗑
-            </button>
-          )}
+          <div className="text-lg font-bold tracking-wide">
+            New list
+          </div>
         </div>
-      )
-    })}
+      </div>
 
-    {/* New List Card */}
-    <div
-      className="flex items-center justify-center gap-4 p-4 rounded-xl cursor-pointer w-full
-                 bg-gradient-to-r from-[#111636]/80 to-[#31324E]/60
-                 text-white
-                 transform transition
-                 hover:-translate-y-1 hover:shadow-lg
-                 active:scale-95
-                 shadow-lg shadow-black/20"
-      onClick={() => {
-        const newId = Date.now()
-        setLists(prev => [
-          ...prev,
-          {
-            id: newId,
-            name: "New Cart List",
-            lastEdited: new Date(),
-            items: []
-          }
-        ])
-        openList(newId)
-      }}
-    >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-2xl leading-none font-bold">
-        +
-      </div>
-      <div className="text-lg font-bold tracking-wide">
-        New list
-      </div>
+      {showAuthModal && (
+        <AuthModal
+          isSignUp={isSignUp}
+          setIsSignUp={setIsSignUp}
+          authEmail={authEmail}
+          setAuthEmail={setAuthEmail}
+          authPassword={authPassword}
+          setAuthPassword={setAuthPassword}
+          authError={authError}
+          setAuthError={setAuthError}
+          authProcessing={authProcessing}
+          handleSignIn={handleSignIn}
+          handleSignUp={handleSignUp}
+          setShowAuthModal={setShowAuthModal}
+        />
+      )}
+      {showMobileMenu && (
+        <MobileMenu
+          user={user}
+          setShowMobileMenu={setShowMobileMenu}
+          setShowAuthModal={setShowAuthModal}
+          handleSignOut={handleSignOut}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+      )}
     </div>
-  </div>
-
-  {showAuthModal && (
-    <AuthModal
-      isSignUp={isSignUp}
-      setIsSignUp={setIsSignUp}
-      authEmail={authEmail}
-      setAuthEmail={setAuthEmail}
-      authPassword={authPassword}
-      setAuthPassword={setAuthPassword}
-      authError={authError}
-      setAuthError={setAuthError}
-      authProcessing={authProcessing}
-      handleSignIn={handleSignIn}
-      handleSignUp={handleSignUp}
-      setShowAuthModal={setShowAuthModal}
-    />
-  )}
-  {showMobileMenu && (
-    <MobileMenu
-      user={user}
-      setShowMobileMenu={setShowMobileMenu}
-      setShowAuthModal={setShowAuthModal}
-      handleSignOut={handleSignOut}
-    />
-  )}
-</div>
   )
 }
 
