@@ -1023,6 +1023,7 @@ useEffect(() => {
                 type="text"
                 value={item.quantity}
                 onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="Qty"
                 className="w-16 px-1 py-1 rounded bg-white/10 text-center text-xs border border-white/20 text-white flex-shrink-0"
               />
@@ -1107,12 +1108,13 @@ useEffect(() => {
 
               {/* Quantity input */}
               <input
-                type="text"
-                value={item.quantity}
-                onChange={(e) => updateItemQuantity(item.id, e.target.value)}
-                placeholder="Qty"
-                className="w-16 px-1 py-1 rounded bg-white/10 text-center text-xs border border-white/20 text-white flex-shrink-0"
-              />
+                  type="text"
+                  value={item.quantity}
+                  onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="Qty"
+                  className="w-16 px-1 py-1 rounded bg-white/10 text-center text-xs border border-white/20 text-white flex-shrink-0"
+                />
 
               <button
                 onClick={() => deleteItem(item.id)}
