@@ -1033,7 +1033,7 @@ useEffect(() => {
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
                            text-white hover:bg-red-600 active:scale-95 text-lg"
               >
-                🗑
+                <img src="/delete-svgrepo-com.png" alt="Delete" className="w-7 h-7" />
               </button>
             </div>
           ))}
@@ -1121,7 +1121,7 @@ useEffect(() => {
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
                            text-white hover:bg-red-600 active:scale-95 text-lg"
               >
-                🗑
+                < img src="/delete-svgrepo-com.png" alt="Delete" className="w-7 h-7" />
               </button>
             </div>
           ))}
@@ -1166,7 +1166,7 @@ useEffect(() => {
                     ? "bg-gradient-to-r from-[#4b5563] to-[#6b7280]"   // greyer in dark mode
                     : "bg-gradient-to-r from-[#1a237e] to-[#3949ab] hover:from-[#1a237e] hover:to-[#5c6bc0]"}`}
     >
-      <span>🛒</span>
+      <img src="/cart-plus-svgrepo-com.png" alt="cart" className="w-6 h-6" />
       <span>Add to "To Buy" List</span>
     </button>
   </div>
@@ -1365,7 +1365,7 @@ useEffect(() => {
                              text-white hover:bg-red-600 active:scale-95"
                   onClick={() => setDeleteConfirm(list.id)}
                 >
-                  🗑
+                  <img src="/delete-svgrepo-com.png" alt="Delete" className="w-7 h-7" />
                 </button>
               )}
             </div>
